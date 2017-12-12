@@ -16,7 +16,6 @@ package mem
 
 import (
 	"sync"
-
 	"time"
 
 	"github.com/VolantMQ/persistence"
@@ -79,7 +78,7 @@ func NewMemProvider(config *topicsTypes.MemConfig) (topicsTypes.Provider, error)
 				if m, ok := pkt.(*packet.Publish); ok {
 					if len(d.ExpireAt) > 0 {
 						if tm, err := time.Parse(time.RFC3339, d.ExpireAt); err == nil {
-							m.SetExpiry(tm)
+							m.SetExpireAt(tm)
 						} else {
 							p.log.Error("Decode publish expire at", zap.Error(err))
 						}
@@ -178,16 +177,16 @@ func (mT *provider) Close() error {
 		var encoded []persistence.PersistedPacket
 
 		for _, pkt := range res {
-			// Discard retained QoS0 messages
-			if pkt.QoS() != packet.QoS0 && !pkt.Expired(false) {
+			// Discard retained expired and QoS0 messages
+			if expireAt, _, expired := pkt.Expired(); !expired && pkt.QoS() != packet.QoS0 {
 				if buf, err := packet.Encode(pkt); err != nil {
 					mT.log.Error("Couldn't encode retained message", zap.Error(err))
 				} else {
 					entry := persistence.PersistedPacket{
 						Data: buf,
 					}
-					if tm := pkt.GetExpiry(); !tm.IsZero() {
-						entry.ExpireAt = tm.Format(time.RFC3339)
+					if !expireAt.IsZero() {
+						entry.ExpireAt = expireAt.Format(time.RFC3339)
 					}
 					encoded = append(encoded, entry)
 				}
@@ -249,8 +248,7 @@ func (mT *provider) publisher() {
 	mT.wgPublisherStarted.Done()
 
 	for msg := range mT.inbound {
-		//map[uintptr][]*publishEntry
-		pubEntries := publishEntries{}
+		pubEntries := publishes{}
 
 		mT.smu.Lock()
 		//获取订阅topics相关subscriber
