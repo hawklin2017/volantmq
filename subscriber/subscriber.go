@@ -135,8 +135,6 @@ func (s *Type) Publish(p *packet.Publish, grantedQoS packet.QosType, ops packet.
 		pkt.SetPacketID(0)
 	}
 
-	fmt.Printf("sub qos:%d pub qos:%d\n", grantedQoS, pkt.QoS())
-
 	switch grantedQoS {
 	// If a subscribing Client has been granted maximum QoS 1 for a particular Topic Filter, then a
 	// QoS 0 Application Message matching the filter is delivered to the Client at QoS 0. This means

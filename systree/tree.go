@@ -15,6 +15,7 @@ type impl struct {
 
 // NewTree allocate systree provider
 func NewTree(base string) (Provider, []types.RetainObject, []DynamicValue, error) {
+	//retain存储对象RetainObject，只有Topics函数的接口
 	var retains []types.RetainObject
 	var staticRetains []types.RetainObject
 
@@ -39,6 +40,7 @@ func NewTree(base string) (Provider, []types.RetainObject, []DynamicValue, error
 		newSessions(base, &retains),
 	}
 
+	//系统动态值接口，抽象层
 	var dynUpdates []DynamicValue
 	for _, d := range retains {
 		v := d.(DynamicValue)

@@ -57,6 +57,7 @@ func NewMemProvider(config *topicsTypes.MemConfig) (topicsTypes.Provider, error)
 		inRetained:         make(chan types.RetainObject, 1024*512),
 	}
 	//p.allowOverlapping == false
+	//主题树根节点, 每一层都以node[level]为索引
 	p.root = newNode(p.allowOverlapping, nil)
 
 	p.log = configuration.GetLogger().Named("topics").Named(config.Name)
@@ -68,21 +69,25 @@ func NewMemProvider(config *topicsTypes.MemConfig) (topicsTypes.Provider, error)
 		}
 
 		for _, d := range entries {
+			//注意第一个字节是协议版本,例如v3.1.1
 			v := packet.ProtocolVersion(d.Data[0])
 			//解析出header固定头部
-			//解析出Publish可变报头、负载
+			//1，解析出Publish可变报头、负载
 			pkt, _, err := packet.Decode(v, d.Data[1:])
 			if err != nil {
 				p.log.Error("Couldn't decode retained message", zap.Error(err))
 			} else {
+				//2，这里表示只存储Publish报文
 				if m, ok := pkt.(*packet.Publish); ok {
 					if len(d.ExpireAt) > 0 {
 						if tm, err := time.Parse(time.RFC3339, d.ExpireAt); err == nil {
+							//3，设置过期时间
 							m.SetExpireAt(tm)
 						} else {
 							p.log.Error("Decode publish expire at", zap.Error(err))
 						}
 					}
+					//4，调用topicsMgr存储接口，实际上就是写入channel
 					p.Retain(m) // nolint: errcheck
 				} else {
 					p.log.Warn("Unsupported retained message type", zap.String("type", m.Type().Name()))
@@ -229,6 +234,7 @@ func (mT *provider) retain(obj types.RetainObject) {
 	mT.smu.Unlock()
 }
 
+//this is topicsType.Provider, also is topicsMgr
 //内部goroutine，处理主题树存储
 func (mT *provider) retainer() {
 	defer func() {
@@ -241,13 +247,14 @@ func (mT *provider) retainer() {
 	}
 }
 
+//this is topicsType.Provider, also is topicsMgr
 //内部goroutine，处理主题树发布
-//this is topics provider, also is topicsMgr
 func (mT *provider) publisher() {
 	defer mT.wgPublisher.Done()
 	mT.wgPublisherStarted.Done()
 
 	for msg := range mT.inbound {
+		//map[uintptr][]*publish
 		pubEntries := publishes{}
 
 		mT.smu.Lock()

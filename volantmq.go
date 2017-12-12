@@ -184,6 +184,7 @@ func NewServer(config *ServerConfig) (Server, error) {
 		return nil, errors.New("persistence provider cannot be nil")
 	}
 
+	//读取系统版本、节点名，system桶
 	var systemPersistence persistence.System
 	var systemState *persistence.SystemState
 
@@ -223,16 +224,18 @@ func NewServer(config *ServerConfig) (Server, error) {
 		return nil, err
 	}
 
+	//retain存储packet，Store，Load接口
 	persisRetained, _ = s.Persistence.Retained()
 
 	tConfig := topicsTypes.NewMemConfig()
 
 	tConfig.Stat = s.sysTree.Topics()
 	tConfig.Persist = persisRetained
+	//AllowOverlappingSubscriptions默认false，详见定义处注释
 	tConfig.AllowOverlappingSubscriptions = config.AllowOverlappingSubscriptions
 
-	//创建两个rountine,分别用于存储和发布
-	//topicsMgr只是接口，topicsTypes.Provider， 具体mem.provider
+	//创建两个rountine,分别用于主题树存储和发布
+	//topicsMgr只是接口：topicsTypes.Provider， 具体mem.provider
 	if s.topicsMgr, err = topics.New(tConfig); err != nil {
 		return nil, err
 	}
