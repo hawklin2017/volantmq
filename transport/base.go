@@ -101,6 +101,7 @@ func (c *baseConfig) handleConnection(conn conn) {
 	var req packet.Provider
 
 	var buf []byte
+	//读取一个完整报文
 	if buf, err = routines.GetMessageBuffer(conn); err != nil {
 		c.log.Error("Couldn't get CONNECT message", zap.Error(err))
 		return

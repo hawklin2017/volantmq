@@ -318,6 +318,7 @@ func (msg *Connect) encodeMessage(to []byte) (int, error) {
 	return offset, nil
 }
 
+//解析有效负荷
 func (msg *Connect) decodeMessage(from []byte) (int, error) {
 	var err error
 	var n int

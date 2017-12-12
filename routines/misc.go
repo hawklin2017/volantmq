@@ -18,6 +18,7 @@ package routines
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 
@@ -55,6 +56,7 @@ func GetMessageBuffer(c io.Closer) ([]byte, error) {
 		return nil, ErrInvalidConnectionType
 	}
 
+	//没有make，直接append
 	var buf []byte
 	// tmp buffer to read a single byte
 	var b = make([]byte, 1)
@@ -82,15 +84,19 @@ func GetMessageBuffer(c io.Closer) ([]byte, error) {
 
 		// Check the remLen byte (1+) to see if the continuation bit is set. If so,
 		// increment cnt and continue reading. Otherwise break.
+		//跟mqtt协议紧耦合，NOTICE!!!!!!!
 		if l > 1 && b[0] < 0x80 {
 			break
 		}
 	}
 
+	fmt.Println("read:", buf)
+
 	// Get the remaining length of the message
 	remLen, _ := binary.Uvarint(buf[1:])
 	buf = append(buf, make([]byte, remLen)...)
 
+	//只读取remian length，多余丢弃
 	for l < len(buf) {
 		n, err := conn.Read(buf[l:])
 		if err != nil {

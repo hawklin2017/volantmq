@@ -261,6 +261,7 @@ func (msg *Publish) decodeMessage(from []byte) (int, error) {
 	}
 
 	// [MQTT-3.3.1-2]
+	//QOS 0,不允许带dup标示，dup是重复发送数据标示
 	if msg.QoS() == QoS0 && msg.Dup() {
 		var rejectCode ReasonCode
 		if msg.version == ProtocolV50 {
@@ -273,6 +274,7 @@ func (msg *Publish) decodeMessage(from []byte) (int, error) {
 	}
 
 	// [MQTT-3.3.2.1]
+	//解析topics name, Publish报文可变报头topics name排第一个
 	buf, n, err = ReadLPBytes(from[offset:])
 	offset += n
 	if err != nil {
@@ -320,6 +322,7 @@ func (msg *Publish) decodeMessage(from []byte) (int, error) {
 		}
 	}
 
+	//remain length = 有效负荷 + 可变报头
 	pLen := int(msg.remLen) - offset
 
 	// check payload len is not malformed

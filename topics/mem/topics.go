@@ -50,12 +50,14 @@ var _ topicsTypes.Provider = (*provider)(nil)
 // when the server goes, everything will be gone. Use with care.
 func NewMemProvider(config *topicsTypes.MemConfig) (topicsTypes.Provider, error) {
 	p := &provider{
-		stat:               config.Stat,
+		stat: config.Stat,
+		//retain存储, load/store packet
 		persist:            config.Persist,
 		onCleanUnsubscribe: config.OnCleanUnsubscribe,
 		inbound:            make(chan *packet.Publish, 1024*512),
 		inRetained:         make(chan types.RetainObject, 1024*512),
 	}
+	//p.allowOverlapping == false
 	p.root = newNode(p.allowOverlapping, nil)
 
 	p.log = configuration.GetLogger().Named("topics").Named(config.Name)
@@ -68,6 +70,8 @@ func NewMemProvider(config *topicsTypes.MemConfig) (topicsTypes.Provider, error)
 
 		for _, d := range entries {
 			v := packet.ProtocolVersion(d.Data[0])
+			//解析出header固定头部
+			//解析出Publish可变报头、负载
 			pkt, _, err := packet.Decode(v, d.Data[1:])
 			if err != nil {
 				p.log.Error("Couldn't decode retained message", zap.Error(err))
@@ -201,6 +205,8 @@ func (mT *provider) Close() error {
 	return nil
 }
 
+//topicsTypes.Provider
+//存储主题树
 func (mT *provider) retain(obj types.RetainObject) {
 	insert := true
 
@@ -224,6 +230,7 @@ func (mT *provider) retain(obj types.RetainObject) {
 	mT.smu.Unlock()
 }
 
+//内部goroutine，处理主题树存储
 func (mT *provider) retainer() {
 	defer func() {
 		mT.wgPublisher.Done()
@@ -235,18 +242,25 @@ func (mT *provider) retainer() {
 	}
 }
 
+//内部goroutine，处理主题树发布
+//this is topics provider, also is topicsMgr
 func (mT *provider) publisher() {
 	defer mT.wgPublisher.Done()
 	mT.wgPublisherStarted.Done()
 
 	for msg := range mT.inbound {
+		//map[uintptr][]*publishEntry
 		pubEntries := publishEntries{}
 
 		mT.smu.Lock()
+		//获取订阅topics相关subscriber
 		mT.subscriptionSearch(msg.Topic(), msg.PublishID(), &pubEntries)
 
+		//map
 		for _, pub := range pubEntries {
+			//slice
 			for _, e := range pub {
+				//s为subscriber.Type
 				if err := e.s.Publish(msg, e.qos, e.ops, e.ids); err != nil {
 					mT.log.Error("Publish error", zap.Error(err))
 				}

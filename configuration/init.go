@@ -35,7 +35,8 @@ func init() {
 func Init(ops Options) {
 	cfg.once.Do(func() {
 		logCfg := zap.NewProductionConfig()
-		logCfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+		//logCfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+		logCfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 
 		logCfg.DisableStacktrace = true
 

@@ -97,8 +97,9 @@ func newSession(c *sessionPreConfig) *session {
 		sessionEvents: c.sessionEvents,
 		id:            c.id,
 		createdAt:     c.createdAt,
-		messenger:     c.messenger,
-		isOnline:      make(chan struct{}),
+		//topicsMgr
+		messenger: c.messenger,
+		isOnline:  make(chan struct{}),
 	}
 
 	s.timer = time.AfterFunc(10*time.Second, s.timerCallback)
@@ -118,10 +119,11 @@ func (s *session) reconfigure(c *sessionReConfig, runExpiry bool) {
 
 func (s *session) allocConnection(c *connection.PreConfig) error {
 	cfg := &connection.Config{
-		PreConfig:        c,
-		ID:               s.id,
-		OnDisconnect:     s.onDisconnect,
-		Subscriber:       s.subscriber,
+		PreConfig:    c,
+		ID:           s.id,
+		OnDisconnect: s.onDisconnect,
+		Subscriber:   s.subscriber,
+		//topicsMgr
 		Messenger:        s.messenger,
 		KillOnDisconnect: s.killOnDisconnect,
 		ExpireIn:         s.expireIn,
@@ -159,6 +161,7 @@ func (s *session) stop(reason packet.ReasonCode) *persistence.SessionState {
 	}
 
 	if !s.finalized {
+		//记录系统topics
 		s.signalClose(s.id, exitReasonShutdown)
 		s.finalized = true
 	}

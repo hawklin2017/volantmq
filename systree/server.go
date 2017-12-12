@@ -25,6 +25,9 @@ type server struct {
 	}
 }
 
+//C 语法，修改传递参数
+//uptime、datetime动态值，继承dynamicValue（Retained/Publish/Topics）生成retained、publish时候，通过getValue获取实际值
+//version、capabilities静态值
 func newServer(topicPrefix string, dynRetains, staticRetains *[]types.RetainObject) server {
 	b := server{
 		upTime:   newDynamicValueUpTime(topicPrefix + "/uptime"),

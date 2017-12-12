@@ -107,6 +107,7 @@ func (l *tcp) Serve() error {
 			}
 
 			// Borrowed from go1.3.3/src/pkg/net/http/server.go:1699
+			//类似于EINTR/EWOLDBLOCK???
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
 				if tempDelay == 0 {
 					tempDelay = 5 * time.Millisecond
@@ -130,6 +131,7 @@ func (l *tcp) Serve() error {
 		go func(cn net.Conn) {
 			defer l.onConnection.Done()
 
+			//无错误返回
 			if conn, err := newConnTCP(cn, l.Metric.Bytes()); err != nil {
 				l.log.Error("Couldn't create connection interface", zap.Error(err))
 			} else {

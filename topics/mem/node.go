@@ -97,6 +97,7 @@ func (mT *provider) leafSearchNode(levels []string) *node {
 	return root
 }
 
+//插入主题树，并挂入订阅者
 func (mT *provider) subscriptionInsert(filter string, sub topicsTypes.Subscriber, p *topicsTypes.SubscriptionParams) bool {
 	levels := strings.Split(filter, "/")
 
@@ -167,10 +168,12 @@ func subscriptionRecurseSearch(root *node, levels []string, publishID uintptr, p
 		// leaf level of the topic
 		// get all subscribers and return
 		root.getSubscribers(publishID, p)
+		//如果有人订阅了#, 则放入publish里面
 		if n, ok := root.children[topicsTypes.MWC]; ok {
 			n.getSubscribers(publishID, p)
 		}
 	} else {
+		//如果有人订阅了#, 则放入publish里面
 		if n, ok := root.children[topicsTypes.MWC]; ok && len(levels[0]) != 0 {
 			n.getSubscribers(publishID, p)
 		}
@@ -185,6 +188,8 @@ func subscriptionRecurseSearch(root *node, levels []string, publishID uintptr, p
 	}
 }
 
+//又拿参数作为返回值！！！！p为返回值
+//遍历主题树，拿到所有订阅者，生成发布者
 func (mT *provider) subscriptionSearch(topic string, publishID uintptr, p *publishEntries) {
 	root := mT.root
 	levels := strings.Split(topic, "/")
@@ -202,6 +207,7 @@ func (mT *provider) retainInsert(topic string, obj types.RetainObject) {
 
 	root := mT.leafInsertNode(levels)
 
+	//空指针用法
 	root.retained = obj
 }
 
@@ -306,6 +312,8 @@ func (sn *node) allRetained(retained *[]*packet.Publish) {
 }
 
 func (sn *node) overlappingSubscribers(publishID uintptr, p *publishEntries) {
+	//sn.subs == map[uintptr]*subscribedEntry
+	//p == map[uintptr][]*publishEntry
 	for id, sub := range sn.subs {
 		if s, ok := (*p)[id]; ok {
 			if sub.p.ID > 0 {

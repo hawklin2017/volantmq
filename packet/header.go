@@ -221,6 +221,8 @@ func (h *header) setType(t Type) {
 // decode reads fixed header and remaining length
 // if decode successful size of decoded data provided
 // if error happened offset points to error place
+//检查header是否合法
+//解析mType、mFlags、remLen
 func (h *header) decode(from []byte) (int, error) {
 	offset := 0
 
@@ -231,9 +233,13 @@ func (h *header) decode(from []byte) (int, error) {
 
 	reject := false
 	// [MQTT-2.2.2-1]
+	//publish 允许存在dup、QOS、retain
 	if h.mType != PUBLISH && h.mFlags != h.mType.DefaultFlags() {
 		reject = true
 	} else {
+		//bug!!!! 例如CONNECT报文，存在DUP等标示
+		//todo:此处应该只针对于PUBLISH报文判断
+		//QOS为0-4bit中2、3位
 		if !QosType((h.mFlags & maskPublishFlagQoS) >> offsetPublishFlagQoS).IsValid() {
 			reject = true
 		}

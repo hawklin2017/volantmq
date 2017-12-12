@@ -82,7 +82,10 @@ func NewManager(c *Config) (*Manager, error) {
 		log:    configuration.GetLogger().Named("sessions"),
 	}
 
+	//new epoll事件，同时注册close fd事件(eventfd)
 	m.poll, _ = netpoll.New(nil)
+
+	//persistence为session存储
 	m.persistence, _ = c.Persist.Sessions()
 
 	var err error
@@ -133,6 +136,7 @@ func (m *Manager) Shutdown() error {
 
 // NewSession create new session with provided established connection
 // This is god function. Might be try split it
+//SessionMgr
 func (m *Manager) NewSession(config *StartConfig) {
 	var id string
 	var ses *session
@@ -299,6 +303,7 @@ func (m *Manager) newConnectionPreConfig(config *StartConfig) *connection.PreCon
 		Desc:            netpoll.Must(netpoll.HandleReadOnce(config.Conn)),
 		MaxTxPacketSize: types.DefaultMaxPacketSize,
 		SendQuota:       types.DefaultReceiveMax,
+		//persistence为session存储
 		State:           m.persistence,
 		EventPoll:       m.poll,
 		Metric:          m.Systree.Metric(),
@@ -311,6 +316,7 @@ func (m *Manager) newConnectionPreConfig(config *StartConfig) *connection.PreCon
 }
 
 func (m *Manager) configureSession(config *StartConfig, ses *session, id string, idGenerated bool) (*systree.ClientConnectStatus, error) {
+	//查找是否存在subscriber
 	sub, sessionPresent := m.getSubscriber(id, config.Req.IsClean(), config.Req.Version())
 
 	sConfig := &sessionReConfig{
@@ -352,6 +358,7 @@ func (m *Manager) configureSession(config *StartConfig, ses *session, id string,
 
 	if err := ses.allocConnection(cConfig); err == nil {
 		if !config.Req.IsClean() {
+			//persistence为session存储
 			m.persistence.Delete([]byte(id)) // nolint: errcheck
 		}
 
@@ -553,6 +560,7 @@ func (m *Manager) onSessionClose(id string, reason exitReason) {
 	m.sessionsCount.Done()
 }
 
+//这里的Manager为SessionMgr，persistence为Session存储
 func (m *Manager) loadSessions() error {
 	subs := map[string]*subscriberConfig{}
 
@@ -591,6 +599,7 @@ func (m *Manager) loadSessions() error {
 					willIn = uint32(val)
 					willAt := since.Add(time.Duration(willIn) * time.Second)
 
+					//过期will立刻发布
 					if time.Now().Before(willAt) {
 						// will delay elapsed. notify that
 						delayedWills = append(delayedWills, will)
@@ -608,6 +617,7 @@ func (m *Manager) loadSessions() error {
 
 					if time.Now().Before(expireAt) {
 						// persisted session has expired, wipe it
+						// 是否可以采用m.persistence.SubscriptionsDelete？？？
 						if err := m.persistence.Delete(id); err != nil && err != persistence.ErrNotFound {
 							m.log.Error("Persisted session delete", zap.Error(err))
 						}
@@ -622,6 +632,7 @@ func (m *Manager) loadSessions() error {
 			// create it and run timer
 			if will != nil || expireIn > 0 {
 				createdAt, _ := time.Parse(time.RFC3339, state.Timestamp)
+				//lock new session
 				ses := m.allocSession(sID, createdAt)
 				var exp *uint32
 				if expireIn > 0 {
@@ -636,14 +647,18 @@ func (m *Manager) loadSessions() error {
 					killOnDisconnect: false,
 				}
 
+				//简单赋值
 				ses.s.reconfigure(setup, true)
+				//存储到内存数据sync.Map
 				m.sessions.Store(id, ses)
 				m.sessionsCount.Add(1)
+				//just unlock new session
 				ses.release()
 			}
 		}
 
 		if len(state.Subscriptions) > 0 {
+			//解析boltDB存储订阅内容，此ID不是报文的ID！！
 			if sCfg, err := m.loadSubscriber(state.Subscriptions); err == nil {
 				subs[sID] = sCfg
 			} else {
@@ -660,6 +675,7 @@ func (m *Manager) loadSessions() error {
 			Timestamp: state.Timestamp,
 		}
 
+		//发布系统状态topics,如$SYS/servers/${nodename}/sessions/${id}/
 		m.Systree.Sessions().Created(sID, status)
 		return nil
 	})
@@ -699,12 +715,17 @@ func (m *Manager) loadSubscriber(from []byte) (*subscriberConfig, error) {
 	version := packet.ProtocolVersion(from[offset])
 	offset++
 	remaining := len(from) - 1
+	//this is better way as follow
+	//for offset < remaining {
 	for offset != remaining {
+		//读取内容前的length，2个字节
+		//t为内容，total为长度
 		t, total, e := packet.ReadLPBytes(from[offset:])
 		if e != nil {
 			return nil, e
 		}
 
+		//total为订阅内容以后的控制报文
 		offset += total
 
 		params := &topicsTypes.SubscriptionParams{}
@@ -714,6 +735,7 @@ func (m *Manager) loadSubscriber(from []byte) (*subscriberConfig, error) {
 
 		params.ID = binary.BigEndian.Uint32(from[offset:])
 		offset += 4
+		//订阅内容对应的参数
 		subscriptions[string(t)] = params
 	}
 

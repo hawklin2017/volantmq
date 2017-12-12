@@ -17,11 +17,23 @@ func NewTree(base string) (Provider, []types.RetainObject, []DynamicValue, error
 	staticRetains := []types.RetainObject{}
 
 	tr := &impl{
+		//系统状态值，例如$SYS/servers/${nodename}/uptime
+		//更新方法为Retained、Publish
 		newServer(base, &retains, &staticRetains),
+		//系统状态值，例如$SYS/servers/${nodename}/metrics/packets/connect
+		//更新方法为Sent、Received
 		newMetric(base, &retains),
+		//系统状态值，例如$SYS/servers/${nodename}/stats/topics/max
+		//更新方法为Added、Removed
 		newStatTopic(base+"/stats", &retains),
+		//系统状态值，例如$SYS/servers/${nodename}/stats/subscriptions/max
+		//更新方法为Subscribed、UnSubscribed
 		newStatSubscription(base+"/stats", &retains),
+		//系统状态值，例如$SYS/servers/${nodename}/client/${id}/connected
+		//更新方法为Connected、Disconnected
 		newClients(base, &retains),
+		//系统状态值，例如$SYS/servers/${nodename}/sessions/${id}/removed
+		//更新方法为Created、Removed
 		newSessions(base, &retains),
 	}
 

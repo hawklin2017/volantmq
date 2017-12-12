@@ -95,6 +95,7 @@ func main() {
 	serverConfig.AllowDuplicates = true
 	serverConfig.Authenticators = "internal"
 
+	//初始化数据库，retained、session、system，同用一把锁/DB
 	serverConfig.Persistence, err = boltdb.New(&boltdb.Config{
 		File: "./persist.db",
 	})
@@ -113,6 +114,7 @@ func main() {
 
 	var authMng *auth.Manager
 
+	//todo delete，equal to srv.authMng
 	if authMng, err = auth.NewManager("internal"); err != nil {
 		logger.Error("Couldn't register *amqp* auth provider", zap.Error(err))
 		return

@@ -98,7 +98,8 @@ type ServerConfig struct {
 // rather than directly ServerConfig structure
 func NewServerConfig() *ServerConfig {
 	return &ServerConfig{
-		Authenticators:                "mockSuccess",
+		Authenticators: "mockSuccess",
+		//内存存储, 非持久化
 		Persistence:                   persistence.Default(),
 		OnDuplicate:                   func(string, bool) {},
 		OfflineQoS0:                   false,
@@ -172,6 +173,7 @@ func NewServer(config *ServerConfig) (Server, error) {
 	s.transports.list = make(map[string]transport.Provider)
 
 	var err error
+	//authMgr提供Password、ACL方法，封装遍历每个provider的相应方法
 	if s.authMgr, err = auth.NewManager(s.Authenticators); err != nil {
 		return nil, err
 	}
@@ -213,6 +215,8 @@ func NewServer(config *ServerConfig) (Server, error) {
 	var retains []types.RetainObject
 	//var dynPublishes []systree.DynamicValue
 
+	//创建系统状态topics，动态和静态的
+	//retain为全部系统topics，s.systree.publishes为系统动态值topics
 	if s.sysTree, retains, s.systree.publishes, err = systree.NewTree("$SYS/servers/" + s.NodeName); err != nil {
 		return nil, err
 	}
@@ -225,6 +229,8 @@ func NewServer(config *ServerConfig) (Server, error) {
 	tConfig.Persist = persisRetained
 	tConfig.AllowOverlappingSubscriptions = config.AllowOverlappingSubscriptions
 
+	//创建两个rountine,分别用于存储和发布
+	//topicsMgr只是接口，topicsTypes.Provider， 具体mem.provider
 	if s.topicsMgr, err = topics.New(tConfig); err != nil {
 		return nil, err
 	}
@@ -232,20 +238,24 @@ func NewServer(config *ServerConfig) (Server, error) {
 	if s.WithSystree {
 		s.sysTree.SetCallbacks(s.topicsMgr)
 
+		//存储系统topics
 		for _, o := range retains {
+			//写入topicsMgr.inRetained, topics.retainer协程读取处理
 			if err = s.topicsMgr.Retain(o); err != nil {
 				return nil, err
 			}
 		}
 
 		if s.SystreeUpdateInterval > 0 {
+			//定时更新系统状态topics，s.systree.publishes动态值
 			s.systree.timer = time.AfterFunc(s.SystreeUpdateInterval*time.Second, s.systreeUpdater)
 		}
 	}
 
 	mConfig := &clients.Config{
-		TopicsMgr:                     s.topicsMgr,
-		ConnectTimeout:                s.ConnectTimeout,
+		TopicsMgr:      s.topicsMgr,
+		ConnectTimeout: s.ConnectTimeout,
+		//所有存储接口
 		Persist:                       s.Persistence,
 		Systree:                       s.sysTree,
 		AllowReplace:                  s.AllowDuplicates,
@@ -262,6 +272,7 @@ func NewServer(config *ServerConfig) (Server, error) {
 		MaximumQoS:                    packet.QoS2,
 	}
 
+	//采用epoll事件通知机制，最后调用callback
 	if s.sessionsMgr, err = clients.NewManager(mConfig); err != nil {
 		return nil, err
 	}
@@ -281,6 +292,7 @@ func (s *server) ListenAndServe(config interface{}) error {
 		AllowedVersions: s.AllowedVersions,
 	}
 
+	//创建listener，net.Listen封装
 	switch c := config.(type) {
 	case *transport.ConfigTCP:
 		l, err = transport.NewTCP(c, &internalConfig)
@@ -307,6 +319,7 @@ func (s *server) ListenAndServe(config interface{}) error {
 	go func() {
 		defer s.transports.wg.Done()
 
+		//打印
 		s.TransportStatus(":"+l.Port(), "started")
 
 		status := "stopped"

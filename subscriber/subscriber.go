@@ -1,6 +1,7 @@
 package subscriber
 
 import (
+	"fmt"
 	"unsafe"
 
 	"sync"
@@ -141,6 +142,7 @@ func (s *Type) Publish(p *packet.Publish, grantedQoS packet.QosType, ops packet.
 		}
 	}
 
+	// V5.0 ONLY
 	if !ops.RAP() {
 		pkt.SetRetain(false)
 	}
@@ -148,6 +150,8 @@ func (s *Type) Publish(p *packet.Publish, grantedQoS packet.QosType, ops packet.
 	if pkt.QoS() != packet.QoS0 {
 		pkt.SetPacketID(0)
 	}
+
+	fmt.Printf("sub qos:%d pub qos:%d\n", grantedQoS, pkt.QoS())
 
 	switch grantedQoS {
 	// If a subscribing Client has been granted maximum QoS 1 for a particular Topic Filter, then a
@@ -167,6 +171,8 @@ func (s *Type) Publish(p *packet.Publish, grantedQoS packet.QosType, ops packet.
 		//case message.QoS0:
 	}
 
+	fmt.Printf("sub qos:%d pub qos:%d\n", grantedQoS, pkt.QoS())
+
 	select {
 	case <-s.isOnline:
 		// if session is offline forward message to persisted storage
@@ -174,6 +180,7 @@ func (s *Type) Publish(p *packet.Publish, grantedQoS packet.QosType, ops packet.
 		qos := pkt.QoS()
 		if qos != packet.QoS0 || (s.offlineQoS0 && qos == packet.QoS0) {
 			defer s.wgOffline.Done()
+			//居然用读锁!!!
 			s.publishLock.RLock()
 			s.wgOffline.Add(1)
 			s.publishLock.RUnlock()
@@ -182,6 +189,7 @@ func (s *Type) Publish(p *packet.Publish, grantedQoS packet.QosType, ops packet.
 	default:
 		// forward message to publish queue
 		defer s.wgOnline.Done()
+		//居然用读锁!!!
 		s.publishLock.RLock()
 		s.wgOnline.Add(1)
 		s.publishLock.RUnlock()

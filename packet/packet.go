@@ -238,6 +238,8 @@ func Decode(v ProtocolVersion, buf []byte) (msg Provider, total int, err error) 
 	}
 
 	// [MQTT-2.2]
+	//第一个字节4-7位报文类型，大端
+	//offsetPacketType 0x04
 	mType := Type(buf[0] >> offsetPacketType)
 
 	// [MQTT-2.2.1] Type.New validates message type
@@ -245,6 +247,7 @@ func Decode(v ProtocolVersion, buf []byte) (msg Provider, total int, err error) 
 		return nil, 0, err
 	}
 
+	//调用父类 header.decode，然后才是mType.decodeMessage
 	if total, err = msg.decode(buf); err != nil {
 		return nil, total, err
 	}
