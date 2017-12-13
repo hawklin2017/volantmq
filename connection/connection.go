@@ -269,6 +269,7 @@ func New(opts ...Option) Initial {
 		quit:  make(chan struct{}),
 	}
 
+	//闭包函数初始化参数
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -289,11 +290,14 @@ func New(opts ...Option) Initial {
 }
 
 // Accept start handling incoming connection
+//加入epoll处理读事件
 func (s *impl) Accept() (chan interface{}, error) {
 	s.connect = make(chan interface{})
 
 	s.desc = netpoll.Must(netpoll.HandleReadOnce(s.conn))
 	s.keepAliveTimer = time.AfterFunc(time.Duration(s.keepAlive), s.keepAliveFired)
+
+	//desc里面的file是句柄，在epoll start转化成fd
 	return s.connect, s.ePoll.Start(s.desc, s.rxConnection)
 }
 
@@ -613,6 +617,7 @@ func (s *impl) processIncoming(p packet.Provider) error {
 
 	switch pkt := p.(type) {
 	case *packet.Connect:
+		//这里返回的resp都是为空
 		resp, err = s.onConnect(pkt)
 	case *packet.Auth:
 		resp, err = s.onAuth(pkt)

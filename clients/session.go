@@ -78,6 +78,8 @@ func newSession(c sessionPreConfig) *session {
 func (s *session) configure(c sessionConfig, clean bool) {
 	s.sessionConfig = c
 
+	//这里的conn，实际上就是conn对session的封装
+	//在conn层上注册了session相关回调函数
 	s.conn.SetOptions(connection.AttachSession(s))
 
 	if !clean {
@@ -155,6 +157,7 @@ func (s *session) SignalPublish(pkt *packet.Publish) error {
 	return nil
 }
 
+//订阅内容入口
 func (s *session) SignalSubscribe(pkt *packet.Subscribe) (packet.Provider, error) {
 	m, _ := packet.New(s.version, packet.SUBACK)
 	resp, _ := m.(*packet.SubAck)

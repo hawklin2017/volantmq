@@ -124,10 +124,12 @@ func (l *tcp) Serve() error {
 		}
 
 		l.onConnection.Add(1)
+
+		//典型:golang启动一个协程处理网络连接, 同时采用闭包:l
 		go func(cn net.Conn) {
 			defer l.onConnection.Done()
 
-			//无错误返回
+			//然而下面函数无错误返回
 			if conn, err := newConnTCP(cn, l.Metric.Bytes()); err != nil {
 				l.log.Error("Couldn't create connection interface", zap.Error(err))
 			} else {

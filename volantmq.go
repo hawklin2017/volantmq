@@ -252,7 +252,7 @@ func NewServer(config *ServerConfig) (Server, error) {
 		}
 
 		if s.SystreeUpdateInterval > 0 {
-			//定时更新系统状态topics，s.systree.publishes动态值
+			//定时更新系统状态topics，s.systree.publishes动态值，默认不开启
 			s.systree.timer = time.AfterFunc(s.SystreeUpdateInterval*time.Second, s.systreeUpdater)
 		}
 	}

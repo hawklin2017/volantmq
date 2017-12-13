@@ -75,13 +75,16 @@ func (s *impl) rxRoutine() {
 func (s *impl) connectionRoutine() {
 	buf := bufio.NewReader(s.conn)
 
+	//解析出具体type的报文
 	pkt, err := s.readPacket(buf)
 
 	s.keepAliveTimer.Stop()
 	if err == nil {
+		//更新系统状态值
 		s.metric.Received(pkt.Type())
 		err = s.processIncoming(pkt)
 	} else {
+		//与创建协程的通信
 		s.connect <- err
 	}
 }
@@ -124,6 +127,7 @@ func (s *impl) readPacket(buf *bufio.Reader) (packet.Provider, error) {
 		return nil, packet.CodePacketTooLarge
 	}
 
+	//这段暂时没搞明白
 	offset := len(s.rxRecv) - s.rxRemaining
 
 	for offset != s.rxRemaining {

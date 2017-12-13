@@ -121,6 +121,8 @@ func NewManager(c *Config) (*Manager, error) {
 
 		// load sessions for fill systree
 		// those sessions having either will delay or expire are created with and timer started
+		//每个session最终会调用m.LoadSession，处理过期session、will
+		//结果都放在preloadConfigs
 		err = m.persistence.LoadForEach(m, context)
 
 		uiprogress.Stop()
@@ -134,7 +136,9 @@ func NewManager(c *Config) (*Manager, error) {
 		m.log.Info("No persisted sessions")
 	}
 
+	//空函数
 	m.configurePersistedSubscribers()
+	//发布过期will
 	m.processDelayedWills()
 
 	return m, nil
@@ -206,6 +210,7 @@ func (m *Manager) LoadSession(context interface{}, id []byte, state *persistence
 		}
 	}
 
+	//更新系统状态值
 	m.Systree.Sessions().Created(sID, status)
 	return nil
 }
@@ -230,12 +235,16 @@ func (m *Manager) Handle(conn net.Conn, auth auth.SessionPermissions) error {
 
 	var connParams *connection.ConnectParams
 	var ack *packet.ConnAck
+	//设置epoll读取事件
+	//启动协程读取数据，并解析报文，这里主要处理connect、auth报文
 	if ch, err := cn.Accept(); err == nil {
+		//从管道里读取数据，和底层负责读取解析数据的协程通信，该协程绑定于epoll读事件
 		for dl := range ch {
 			var resp packet.Provider
 			switch obj := dl.(type) {
 			case *connection.ConnectParams:
 				connParams = obj
+				//生成connack报文
 				resp, err = m.processConnect(cn, connParams)
 			case connection.AuthParams:
 				resp, err = m.processAuth(connParams, obj)
@@ -431,7 +440,11 @@ func (m *Manager) allocContainer(id string, createdAt time.Time, cn connection.S
 
 	wrap := &container{}
 	ses.idLock = &wrap.lock
+
+	//空指针用法，存在一定风险，指针释放还在引用
 	wrap.ses.Store(ses)
+
+	//lock
 	wrap.acquire()
 
 	return wrap
@@ -451,6 +464,7 @@ func (m *Manager) loadContainer(cn connection.Session, params *connection.Connec
 		// lock id to prevent other upcoming session make any changes until we done
 		currContainer.acquire()
 
+		//空指针用法，存在一定风险，指针释放还在引用
 		if current := currContainer.session(); current != nil {
 			m.OnReplaceAttempt(params.ID, m.AllowReplace)
 			if !m.AllowReplace {
@@ -469,6 +483,7 @@ func (m *Manager) loadContainer(cn connection.Session, params *connection.Connec
 			current.stop(packet.CodeSessionTakenOver)
 		}
 
+		//空指针用法，存在一定风险，指针释放还在引用
 		if val := currContainer.expiry.Load(); val != nil {
 			exp := val.(*expiry)
 			exp.cancel()
@@ -699,6 +714,7 @@ func (m *Manager) decodeSessionExpiry(ctx *loadContext, id string, state *persis
 			willIn = uint32(val)
 			willAt := since.Add(time.Duration(willIn) * time.Second)
 
+			//过期的遗嘱立刻发布
 			if time.Now().After(willAt) {
 				// will delay elapsed. notify keep in list and publish when all persisted sessions loaded
 				ctx.delayedWills = append(ctx.delayedWills, will)
